@@ -1,0 +1,10 @@
+steps:
+  # Test cloud build
+  - id: test-cloud-build
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        env
+        echo "Hello Cloud Build!"
