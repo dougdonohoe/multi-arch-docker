@@ -138,7 +138,7 @@ substitutions:
   # By default, when this build is run, artifacts are published to development docker repo
   _ENV: docker-dev
   # Where to find cloud builder image (default version should be in kept in sync with Makefile)
-  _CLOUDBUILD_IMAGE: us-docker.pkg.dev/multi-arch-docker/docker-prod/cloud-build:alpine3.15
+  _CLOUDBUILD_IMAGE: us-docker.pkg.dev/multi-arch-docker/docker-dev/cloud-build:alpine3.15
 options:
   machineType: "E2_HIGHCPU_8"
 tags: ["build", "multi-arch"]
