@@ -1,10 +1,146 @@
 steps:
-  # Test cloud build
-  - id: test-cloud-build
+  #
+  # SSH setup - get our password-less gcloud SSH key to enable ssh tunneling to arm64 VM
+  #
+  - id: setup-ssh
     name: gcr.io/cloud-builders/gcloud
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        env
-        echo "Hello Cloud Build!"
+        set -o errexit
+
+        # Get google_compute_engine key (as documented in ARM64_BUILDER.md)
+        mkdir -p /builder/home/.ssh
+        gcloud secrets versions access latest --secret=build-google_compute_engine-ssh-priv > /builder/home/.ssh/google_compute_engine
+        gcloud secrets versions access latest --secret=build-google_compute_engine-ssh-pub > /builder/home/.ssh/google_compute_engine.pub
+        chmod 700 /builder/home/.ssh
+        chmod 600 /builder/home/.ssh/google_compute_engine
+  #
+  # Start VM - NOTE: this is done mainly for this demo, so I don't personally have to have the
+  #            arm64 VM running all the time.  Depending on your use case, it might make sense to have
+  #            a dedicated VM always running.  Starting/stopping obviously won't work if you have
+  #            concurrent builds happening.
+  #
+  - id: start-arm64-vm
+    name: ${_CLOUDBUILD_IMAGE}
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -o errexit
+        make start-vm
+        # A bit dodgy, but need to sleep a bit otherwise IAP-ssh tunnel fails with 
+        # "Error while connecting [4047: 'Failed to lookup instance']."
+        # Maybe a wait-for loop here would make sense?
+        echo "Sleeping 60 seconds to allow IAP to be able to find the VM..."
+        sleep 60
+  #
+  # Thirdparty - update thirdparty images if needed
+  #
+  - id: thirdparty
+    name: ${_CLOUDBUILD_IMAGE}
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        ENV=${_ENV} make thirdparty
+  #
+  # Setup - Here we need to configure things for 'docker buildx' to work.  Also used with 'waitFor',
+  #         where steps after this occur in parallel.
+  #
+  - id: setup
+    name: ${_CLOUDBUILD_IMAGE}
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -o errexit
+
+        # configure binfmt_misc with other architectures (e.g., arm64)
+        # this also, weirdly, seems to also make 'buildx' a recognized
+        # docker command (running 'docker buildx version' prior to this
+        # results in "'buildx' is not a docker command." error)
+        docker run --privileged --rm tonistiigi/binfmt --install all
+        docker version
+        docker buildx version
+
+        # create contexts: amd64 using localhost and arm64 using tunnel to dedicated VM
+        # this is how we use a remote VM to do the arm64 builds.  Each build step
+        # needs to create an ssh tunnel to the VM on port 2375
+        docker context create amd_node --docker "host=unix:///var/run/docker.sock"
+        docker context create arm_node --docker "host=tcp://127.0.0.1:2375"
+        echo "Docker contexts:"
+        docker context ls
+
+        # log env info
+        ENV=${_ENV} MULTI_CONTEXT=1 make info
+        echo "Ready, set, build!"
+  #
+  # Runtime image
+  #
+  - id: runtime
+    name: ${_CLOUDBUILD_IMAGE}
+    waitFor:
+      - setup
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -o errexit
+        make ssh-tunnel
+        ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="runtime" make buildx-publish-runtime
+  #
+  # Build image
+  #
+  - id: build
+    name: ${_CLOUDBUILD_IMAGE}
+    waitFor:
+      - setup
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -o errexit
+        make ssh-tunnel
+        ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="build" make buildx-publish-build
+  #
+  # odb
+  #
+  - id: odb
+    name: ${_CLOUDBUILD_IMAGE}
+    waitFor:
+      - setup
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        set -o errexit
+        make ssh-tunnel
+        ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="odb" make buildx-publish-odb
+  #
+  # Stop VM
+  #
+  - id: stop-arm64-vm
+    name: ${_CLOUDBUILD_IMAGE}
+    waitFor:
+      - runtime
+      - build
+      - odb
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -o errexit
+        make stop-vm
+
+substitutions:
+  # By default, when this build is run, artifacts are published to development docker repo
+  _ENV: docker-dev
+  # Where to find cloud builder image (default version should be in kept in sync with Makefile)
+  _CLOUDBUILD_IMAGE: us-docker.pkg.dev/multi-arch-docker/docker-prod/cloud-build:alpine3.15
+options:
+  machineType: "E2_HIGHCPU_8"
+tags: ["build", "multi-arch"]
+# Allow an hour for a full build, since the C++ based odb can take a while
+timeout: 3600s

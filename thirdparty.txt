@@ -1,0 +1,17 @@
+# This file documents the 3rd party images that are "vendored" by copying
+# from their original locations into our Artifact Registry
+#
+# Format:
+#
+# image/name: tag1 tag2 tag3
+#
+# Comments and whitespace are allowed.
+
+# alpine is root image of our runtime and cloud builder images
+docker.io/alpine: 3.15
+
+# golang is root image of our build images
+docker.io/golang: 1.18-alpine3.15
+
+# debian is used for the odb build
+docker.io/debian: 11-slim

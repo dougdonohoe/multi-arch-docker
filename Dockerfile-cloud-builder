@@ -1,0 +1,40 @@
+# This creates the image used in GCP Cloud builds (see _CLOUDBUILD_IMAGE in cloudbuild/pr.yaml).
+# It essentially installs needed build tools like bash, make, docker, buildx plugin, etc.
+# It is built and pushed using 'make build-publish-cloud-builder', and assumes thirdparty images
+# have already been loaded via the 'make thirdparty' command
+
+ARG DOCKER_REPO
+ARG CLOUDBUILD_ALPINE_VERSION
+ARG CLOUDBUILD_GOLANG_VERSION
+
+# Build crane tool first
+FROM ${DOCKER_REPO}/thirdparty/golang:${CLOUDBUILD_GOLANG_VERSION} as build
+
+# Use CGO_ENABLED=0 so statically linked since copying to a different Linux variant
+RUN CGO_ENABLED=0 go install github.com/google/go-containerregistry/cmd/crane@latest
+
+## Build builder image, extend google's gcloud builder
+FROM gcr.io/cloud-builders/gcloud
+
+RUN apt-get update && \
+    apt-get install --yes \
+            ca-certificates \
+            curl \
+            gnupg \
+            lsb-release \
+            net-tools
+
+# Install Docker CLI
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg; \
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+       $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null; \
+    apt-get update && apt-get install --yes docker-ce-cli
+
+# Install numpy, to speed up gcloud tunnel
+RUN apt-get update && apt-get install --yes python3-pip && \
+    $(gcloud info --format="value(basic.python_location)") -m pip install numpy
+
+# Copy crane, set GOPATH (needed by Makefile)
+ENV GOPATH=/go
+COPY --from=build /go/bin/crane /go/bin/crane

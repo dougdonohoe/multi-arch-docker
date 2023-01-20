@@ -1,0 +1,14 @@
+# This is a common, lightweight image meant for running Golang or other binaries
+
+ARG DOCKER_REPO
+ARG ALPINE_VERSION
+
+FROM ${DOCKER_REPO}/thirdparty/alpine:${ALPINE_VERSION}
+
+RUN apk upgrade --no-cache \
+    && apk add --no-cache \
+        ca-certificates \
+        openssl \
+        openssl-dev \
+        pkgconf \
+        tzdata

@@ -1,0 +1,75 @@
+# This is adapted from my odb work done on the odb branch of my vcf-validator fork:
+# https://github.com/dougdonohoe/vcf-validator/blob/odb/README_ODB.md
+# It is used in this repo because it is an example of a long C++ build.
+# See also https://www.codesynthesis.com/pipermail/odb-users/2022-November/004811.html
+# ------------------------------------------------------------------------------------
+# This is an image for building odb (https://www.codesynthesis.com/products/odb)
+
+ARG DOCKER_REPO
+ARG DEBIAN_VERSION
+
+FROM ${DOCKER_REPO}/thirdparty/debian:${DEBIAN_VERSION}
+
+ARG ODB_VERSION
+ARG BUILD2_VERSION=0.15.0
+
+# Linux tools
+RUN apt-get update && apt-get upgrade --yes && \
+    apt-get install --yes \
+        bash \
+        build-essential \
+        curl \
+        file \
+        g++ \
+        gcc \
+        gcc-10-plugin-dev \
+        sudo
+
+# Patch x86 bug (missing header file) https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=980609
+COPY odb/gcc-x86.patch /gcc-x86.patch
+RUN if [ "$(uname -m)" = "x86_64" ] ; then \
+       cd / && patch -p1 < /gcc-x86.patch && rm /gcc-x86.patch; \
+    fi
+
+# build2 https://build2.org/install.xhtml#unix
+# This is required to build the latest version of odb, which has multi-arch support
+RUN set -eux; \
+    url="https://download.build2.org/${BUILD2_VERSION}/build2-install-${BUILD2_VERSION}.sh"; \
+    sha256='814c4f475b42749dab49c52549ef85899749c20e5c32276b281fd58dad54f47b'; \
+    mkdir -p /build/build2; \
+    cd /build/build2; \
+    curl -sSfO "$url"; \
+    echo "$sha256  build2-install-${BUILD2_VERSION}.sh" | sha256sum -cw -; \
+    sh build2-install-${BUILD2_VERSION}.sh --local --yes
+
+# odb binary https://codesynthesis.com/products/odb/doc/install-build2.xhtml
+RUN set -eux; \
+    mkdir -p /build/odb; \
+    cd /build/odb; \
+    bpkg create -d odb-gcc-10 cc  \
+         config.cxx=g++ \
+         config.cc.coptions=-O3 \
+         config.install.root=/usr/local \
+         config.install.sudo=sudo; \
+    cd odb-gcc-10; \
+    bpkg --trust-yes build odb/${ODB_VERSION}@https://pkg.cppget.org/1/beta --yes; \
+    bpkg install odb
+
+# odb library
+RUN set -eux; \
+    cd /build/odb; \
+    bpkg create -d libodb-gcc-10 cc  \
+         config.cxx=g++ \
+         config.cc.coptions=-O3 \
+         config.install.root=/usr/local \
+         config.install.sudo=sudo; \
+    cd libodb-gcc-10; \
+    bpkg add https://pkg.cppget.org/1/beta ;\
+    bpkg --trust-yes fetch ;\
+    bpkg --trust-yes build libodb/${ODB_VERSION} ;\
+    bpkg --trust-yes build libodb-sqlite/${ODB_VERSION} --yes ;\
+    bpkg --trust-yes build libodb-boost/${ODB_VERSION} ;\
+    bpkg install --all --recursive
+
+# Needed so odb can find shared libraries
+ENV LD_LIBRARY_PATH=/usr/local/lib
