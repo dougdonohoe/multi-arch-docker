@@ -32,7 +32,7 @@ Created a dedicated service account in `multi-arch-docker`
 [GCP Console]https://console.cloud.google.com/iam-admin/serviceaccounts?project=multi-arch-docker) for the VM:
 
 * Name: `builder@multi-arch-docker.iam.gserviceaccount.com`
-* Roles: `Secret Manager Secret Accessor`, `Artifact Registry Writer`
+* Roles: `Artifact Registry Writer` - enables push and pull images from Artifact Registry
 
 ## Create SSH Credentials and Saving to Cloud Secrets and Project Metadata
 
@@ -95,7 +95,7 @@ gcloud compute --project multi-arch-docker project-info add-metadata --metadata-
 gcloud compute --project multi-arch-docker project-info describe --format="value(commonInstanceMetadata[items][ssh-keys])"
 ```
 
-You should see them in [GCP Console - Metadata](https://console.cloud.google.com/compute/metadata?project=multi-arch-docker&tab=sshkeys).
+You should see them in the [GCP Console - Metadata](https://console.cloud.google.com/compute/metadata?project=multi-arch-docker&tab=sshkeys).
 
 Remove temp directory and keys:
 
@@ -132,10 +132,10 @@ Add firewall rule enabling IAP access from Cloud Build IPs:
 
 ```bash
 gcloud --project=multi-arch-docker compute firewall-rules create allow-ssh-ingress-from-iap \
---direction=INGRESS \
---action=allow \
---rules=tcp:22 \
---source-ranges=35.235.240.0/20
+  --direction=INGRESS \
+  --action=allow \
+  --rules=tcp:22 \
+  --source-ranges=35.235.240.0/20
 ```
 
 Because we are using IAP, and for stronger security, we have disabled normal `ssh` via this command:
@@ -144,7 +144,7 @@ Because we are using IAP, and for stronger security, we have disabled normal `ss
 gcloud --project=multi-arch-docker compute firewall-rules update default-allow-ssh --disabled
 ```
 
-You can see firewall rules in [GCP Console - Firewall](https://console.cloud.google.com/networking/firewalls/list?project=multi-arch-docker).
+You can see firewall rules in the [GCP Console - Firewall](https://console.cloud.google.com/networking/firewalls/list?project=multi-arch-docker).
 
 You also need [add these roles](https://console.cloud.google.com/iam-admin/iam?project=multi-arch-docker) to the cloud 
 build service account `tbd@cloudbuild.gserviceaccount.com`:
