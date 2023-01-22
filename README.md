@@ -122,16 +122,16 @@ path is used.  If it is not set, `ENV` defaults to `docker-dev` and this value i
 path.  For example,
 [us-docker.pkg.dev/multi-arch-docker/docker-dev](https://console.cloud.google.com/artifacts/docker/multi-arch-docker/us/docker-dev?project=multi-arch-docker).
 
-If you want to use a different testing repository other than `docker-dev`, you can create a new repository 
-at the root level, with these values:
+To create these repositories, or others for testing, use the **+ Create Repository** button and use
+these values:
 
-* Name: `yourname-test`
-* Format: Docker
-* Location type: Multi-region
-* Region: us
-* Encryption: Google-managed encryption key
+* Name: `docker-dev` or `docker-prod` or `yourname-test`
+* Format: `Docker`
+* Location type: `Multi-region`
+* Region: `us`
+* Encryption: `Google-managed encryption key`
 
-Use it in make commands like this:
+Use the `ENV` variable to specify the repo in make commands like this:
 
 ```shell
 ENV=yourname-test make info
@@ -193,6 +193,12 @@ PLATFORMS="linux/arm64" TAG_MODIFIER="arm64-seed" RUNTIME_VERSION=4 make buildx-
 ### `make cloud-build`
 
 This step launches the cloud build (defined in `pr.yaml`) to publish to the `docker-dev` repository.
+
+By default, it assumes the `arm64` VM is running.  To auto start/stop the VM, do this:
+
+```shell
+AUTO_START_STOP=1 make cloud-build
+```
 
 ### Docker Details
 

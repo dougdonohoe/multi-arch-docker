@@ -82,10 +82,6 @@ TMPDIR="$(mktemp -d)"
 trap 'rm -rf -- "$TMPDIR"' EXIT
 TMP_SCRIPT="${TMPDIR}/seed.sh"
 
-# change to parent of 'docker-multi' directory
-PARENT_DIR=$(dirname $(dirname $(cd ${0%/*} && echo $PWD/${0##*/})))
-cd "${PARENT_DIR}"
-
 # We are explicitly setting PLATFORMS, overriding that in the Makefile
 export PLATFORMS="linux/arm64"
 
@@ -93,7 +89,9 @@ export PLATFORMS="linux/arm64"
 export TAG_MODIFIER="arm64-seed"
 
 # Extract build steps from the cloudbuild definition, removing leading spaces, removing BUILDER value,
-grep "make -C docker-multi buildx" cloudbuild/pr.yaml | sed -e 's/^ *//' -e 's/BUILDER=[^ ]* //g' > "${TMP_SCRIPT}"
+# and MULTI_CONTEXT
+grep "make buildx" cloudbuild/pr.yaml | sed -e 's/^ *//' -e 's/BUILDER=[^ ]* //g' \
+ -e 's/MULTI_CONTEXT=1 //' > "${TMP_SCRIPT}"
 
 # Confirm with user
 echo "About to run this script:"

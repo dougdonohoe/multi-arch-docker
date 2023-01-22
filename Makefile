@@ -10,7 +10,7 @@ help:
 # Default to a development docker path (we do this so that we don't accidentally change
 # production 'docker-prod' packages when running on a developer mac)
 ENV ?= docker-dev
-GCP_PROJECT=multi-arch-docker
+GCP_PROJECT ?= multi-arch-docker
 DOCKER_REPO = us-docker.pkg.dev/$(GCP_PROJECT)/$(ENV)
 CACHE_ROOT = $(DOCKER_REPO)/cache
 
@@ -41,6 +41,9 @@ BUILDER ?= builder-local
 
 # Name of the arm64 VM instance
 ARM64_VM ?= "builder-arm64-2cpu"
+
+# By default, do not auto start/stop VM in build
+AUTO_START_STOP ?= 0
 
 # If set to 1, assumes caller has created 'amd_node' and 'arm_node' Docker contexts, which is
 # how we do arm64 builds on remote hardware.  See 'pr.yaml' to see context creation.
@@ -102,7 +105,7 @@ $(GOPATH)/bin/crane:
 thirdparty: $(GOPATH)/bin/crane
 	ENV=$(ENV) PATH=$(GOPATH)/bin:${PATH} ./thirdparty.sh
 
-## build-publish-cloud-builder: build + push the image used in GCP cloud builds (see _CLOUDBUILD_IMAGE in pr.yaml).
+## build-publish-cloud-builder: build + push the image used in GCP cloud builds (see _CLOUDBUILD_IMAGE in pr.yaml)
 # Note: since this is only really used inside of GCP, a multi-arch image isn't necessary here, and we build for amd64
 build-publish-cloud-builder:
 	$(DOCKER) build --file Dockerfile-cloud-builder --pull \
@@ -142,14 +145,14 @@ build-odb:
 # common setup for buildx tasks.  If MULTI_CONTEXT=1, this assumes 'amd_node' and 'arm_node' contexts exist.
 buildx-setup:
 	@echo "Setting up buildx, MULTI_CONTEXT=$(MULTI_CONTEXT).  Current builders:"
-	$(DOCKER_BUILDX_NORMAL) ls
+	$(DOCKER_BUILDX_NORMAL) ls || true
 	@if ! $(DOCKER_BUILDX_NORMAL) inspect --builder $(BUILDER) > /dev/null 2>&1; then \
   		if [ "$(MULTI_CONTEXT)" = "1" ]; then \
   			echo "Creating new multi-context builder '$(BUILDER)'"; \
   		    $(DOCKER_BUILDX_NORMAL) create --use --name $(BUILDER) --platform linux/amd64 amd_node; \
             $(DOCKER_BUILDX_NORMAL) create --append --name $(BUILDER) --platform linux/arm64 arm_node; \
   		else \
-  			echo "Creating new builder '$(BUILDER)'"; exit 1; \
+  			echo "Creating new builder '$(BUILDER)'"; \
   			$(DOCKER_BUILDX_NORMAL) create --name $(BUILDER); \
 		fi \
 	else \
@@ -235,7 +238,7 @@ seed-arm64:
 ## cloud-build: run cloud build
 cloud-build:
 	gcloud builds submit --project=$(GCP_PROJECT) --region=global --config cloudbuild/pr.yaml \
- 		--substitutions=_ENV=$(ENV),_CLOUDBUILD_IMAGE=$(CLOUDBUILD_TAG) \
+ 		--substitutions=_ENV=$(ENV),_CLOUDBUILD_IMAGE=$(CLOUDBUILD_TAG),_AUTO_START_STOP=$(AUTO_START_STOP) \
 		.
 
 ## clean: remove local copies of runtime, build and ODB_validator images
@@ -244,7 +247,7 @@ clean:
 	$(DOCKER) rmi $(BUILD_TAG)
 	$(DOCKER) rmi $(ODB_TAG)
 
-## prune: clean up the local cache specified by $(BUILDER).
+## prune: clean up the local cache specified by $(BUILDER)
 prune:
 	$(DOCKER_BUILDX_NORMAL) prune --builder $(BUILDER) --all --force
 

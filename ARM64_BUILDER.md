@@ -128,7 +128,7 @@ Enable IAP for the project:
 gcloud --project=multi-arch-docker services enable iap.googleapis.com
 ```
 
-Add firewall rule enabling IAP access from Cloud Build IPs:
+Add a firewall rule enabling IAP access from Cloud Build IPs:
 
 ```bash
 gcloud --project=multi-arch-docker compute firewall-rules create allow-ssh-ingress-from-iap \
@@ -173,14 +173,15 @@ use **Create Instance**:
 
 * Name: builder-arm64-2cpu
 * Zone: us-central1-a
-* CPUs: Experimentation shows that 2 CPUs is sufficient to handle multi-arch builds
+* Series: T2A
+* Machine Type: t2a-standard-2 (experimentation shows that 2 CPUs is sufficient to handle multi-arch builds)
 * OS: Debian 11
 * Service Account: `builder@multi-arch-docker.iam.gserviceaccount.com`
 * Disk: 40G, SSD persistent disk
 
 ### Environment Variables
 
-Define some environment variables used in subsequent commands:
+Define some environment variables for use in subsequent commands:
 
 ```bash
 INSTANCE_NAME=builder-arm64-2cpu
@@ -209,7 +210,7 @@ $(gcloud info --format="value(basic.python_location)") -m pip install numpy
 You may need to prefix the above `gcloud compute ssh` command with `CLOUDSDK_PYTHON_SITEPACKAGES=1` if the
 warnings don't go away.
 
-### Installing Docker
+### Install Docker
 
 * Following [debian install instructions](https://docs.docker.com/engine/install/debian/).
 
@@ -226,13 +227,13 @@ apt-get install --yes docker-ce docker-ce-cli containerd.io docker-compose-plugi
 docker run hello-world
 ```
 
-### Configure Docker access:
+### Configure Docker Access
 
 ```bash
 gcloud auth --quiet configure-docker us-docker.pkg.dev
 ```
 
-### SSH Access For Root / Remote Docker Context Testing
+### SSH Access For Root
 
 To allow root login and port forwarding, change these lines to `yes` in `/etc/ssh/sshd_config`:
 
@@ -257,14 +258,13 @@ gcloud compute ssh --zone "us-central1-a" root@$INSTANCE_NAME --project multi-ar
 
 ### Port Forwarding
 
-We can combine Identity Aware Proxy (IAP, see above) with forwarding local Docker port to allow a Google Cloud
-Build to access the VM.  First we need to enable `tcp` on the machine using the localhost address (which we'll 
-be forwarding via `ssh`):
+We can combine Identity Aware Proxy (IAP, see above) with forwarding local the Docker port over `ssh` to allow a Google Cloud
+Build to access the VM.  First we need to enable `tcp` on the machine using the localhost address:
 
 * [Docker Daemon](https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option) - About `tcp://`
 
 By default, listening on the `tcp` socket isn't turned on.  To turn it on, add an override file to specify an alternate
-`ExecStart` command (which is found in `/lib/systemd/system/docker.service`):
+`ExecStart` command (to the default, found in `/lib/systemd/system/docker.service`):
 
 ```bash
 mkdir -p /etc/systemd/system/docker.service.d
@@ -323,7 +323,7 @@ Run `top` on the VM and you should see processes pop up as Docker does its work.
 
 ## Cloud Build
 
-To test a cloud build, make sure the desired VM is set in the Makefile:
+To test a cloud build, make sure the desired VM is set in the `Makefile`:
 
 ```text
 ARM64_VM ?= "builder-arm64-2cpu"
@@ -337,14 +337,16 @@ make cloud-build
 
 Cross your fingers and hope the IAM, Cloud Build, Docker VM stars align!
 
-## Appendix
+## Clean Up
 
-### Start/Stop VM From Command Line
+To start/stop your VM:
 
 ```bash
 make start-vm
 make stop-vm
 ```
+
+## Appendix
 
 ### Delete SSH keys
 
