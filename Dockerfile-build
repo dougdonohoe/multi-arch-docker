@@ -1,0 +1,73 @@
+# This is a base image to use for doing Golang builds.
+
+ARG DOCKER_REPO
+ARG ALPINE_VERSION
+ARG GO_VERSION
+
+FROM ${DOCKER_REPO}/thirdparty/golang:${GO_VERSION}-alpine${ALPINE_VERSION}
+
+# Linux tools
+RUN set -o pipefail -o xtrace \
+    && apk upgrade --no-cache \
+    && apk add --no-cache  \
+        bash \
+        binutils-gold \
+        coreutils \
+        ca-certificates \
+        curl \
+        docker \
+        dpkg \
+        file \
+        findutils \
+        gcc \
+        git \
+        jq \
+        libc-dev \
+        libffi-dev \
+        make \
+        musl-dev \
+        openssh \
+        openssh-client \
+        openssl \
+        openssl-dev \
+        perl \
+        pkgconf \
+        py-pip \
+        python3-dev \
+        python3 \
+        su-exec \
+        tzdata \
+        wget
+
+# Add gcloud to PATH
+ENV PATH=/usr/local/src/google-cloud-sdk/bin:$PATH
+
+# Install gcloud + components
+# NOTE 1: the __pycache__ cleanup is done to reduce image size (if needed, they will be regenerated at runtime)
+# NOTE 2: the .backup directory is also removed to significantly reduce image size
+RUN set -eux; \
+    GCLOUD_VERSION=413.0.0; \
+    dpkgArch="$(dpkg --print-architecture)"; \
+    	dir=/usr/local/src; \
+    	url=; \
+    	case "${dpkgArch##*-}" in \
+    		'amd64') \
+    			url="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-$GCLOUD_VERSION-linux-x86_64.tar.gz"; \
+    			sha256='f5e6e3f08371287e00ae38f804cb02579869f70d88e6bb9dfc1f339d3261e04e'; \
+    			;; \
+    		'arm64') \
+    			url="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-$GCLOUD_VERSION-linux-arm.tar.gz"; \
+    			sha256='3bd79dcceac169b21d2379380116db69312d80ac2e910288e11c64fb20835c5b'; \
+    			;; \
+    		*) echo >&2 "error: unsupported architecture '$dpkgArch' (likely packaging update needed)"; exit 1 ;; \
+    	esac; \
+        curl --location --output gcloud.tar.gz "$url"; \
+        echo "$sha256  gcloud.tar.gz" | sha256sum -cw -; \
+        mkdir -p $dir; \
+        tar -zx -C $dir -f gcloud.tar.gz; \
+        $dir/google-cloud-sdk/install.sh --quiet; \
+        gcloud components install --quiet kubectl; \
+        gcloud auth configure-docker gcr.io,us-central1-docker.pkg.dev --quiet; \
+        rm -f gcloud.tar.gz; \
+        rm -rf $(find $dir/google-cloud-sdk/ -name __pycache__ -type d); \
+        rm -rf $dir/google-cloud-sdk/.install/.backup
