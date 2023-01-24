@@ -316,17 +316,24 @@ Test using the remote docker:
 
 ```bash
 cd multi-arch-docker
-BUILDER=remote-arm-tunnel PLATFORMS=linux/arm64 TAG_MODIFIER="arm64-seed-remote" make buildx-publish-runtime
+BUILDER=remote-arm-tunnel PLATFORMS=linux/arm64 TAG_MODIFIER="arm64-test-remote" make buildx-publish-runtime
 ```
 
 Run `top` on the VM and you should see processes pop up as Docker does its work.
 
 ## Cloud Build
 
-To test a cloud build, make sure the desired VM is set in the `Makefile`:
+To test a cloud build, make sure the desired `ARM64_VM` name and `GCP_PROJECT` is set in the `Makefile`:
 
 ```text
-ARM64_VM ?= "builder-arm64-2cpu"
+GCP_PROJECT ?= multi-arch-docker
+ARM64_VM ?= builder-arm64-2cpu
+```
+
+Enable the Cloud Build API:
+
+```bash
+gcloud services enable cloudbuild.googleapis.com
 ```
 
 Then, to run a build:

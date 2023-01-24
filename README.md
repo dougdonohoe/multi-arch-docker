@@ -137,6 +137,10 @@ Use the `ENV` variable to specify the repo in make commands like this:
 ENV=yourname-test make info
 ```
 
+### `make help`
+
+This list all available `make` commands.
+
 ### `make info`
 
 This steps acts as a sanity check to verify the proper environment variables are being set. 
@@ -194,7 +198,8 @@ PLATFORMS="linux/arm64" TAG_MODIFIER="arm64-seed" RUNTIME_VERSION=4 make buildx-
 
 This step launches the cloud build (defined in `pr.yaml`) to publish to the `docker-dev` repository.
 
-By default, it assumes the `arm64` VM is running.  To auto start/stop the VM, do this:
+By default, it assumes the `arm64` VM is already running (e.g., via `make start-vm`).  To auto start/stop the VM, 
+as build steps, do this:
 
 ```shell
 AUTO_START_STOP=1 make cloud-build

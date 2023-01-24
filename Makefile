@@ -40,7 +40,7 @@ PLATFORMS ?= linux/amd64,linux/arm64
 BUILDER ?= builder-local
 
 # Name of the arm64 VM instance
-ARM64_VM ?= "builder-arm64-2cpu"
+ARM64_VM ?= builder-arm64-2cpu
 
 # By default, do not auto start/stop VM in build
 AUTO_START_STOP ?= 0
