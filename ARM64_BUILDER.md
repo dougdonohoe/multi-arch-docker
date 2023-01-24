@@ -26,12 +26,18 @@ If you have the right permissions, you can create a new GCP project called `mult
 this out.  If you have an existing GCP project, just do a global search and replace 
 of `multi-arch-docker` with your project name in all the files of this repo.
 
+## Enable the Artifact Registry API
+
+```bash
+gcloud --project=multi-arch-docker services enable artifactregistry.googleapis.com
+```
+
 ## Create Service Account
 
 Created a dedicated service account in `multi-arch-docker` 
-[GCP Console]https://console.cloud.google.com/iam-admin/serviceaccounts?project=multi-arch-docker) for the VM:
+[GCP Console](https://console.cloud.google.com/iam-admin/serviceaccounts?project=multi-arch-docker) for the VM:
 
-* Name: `builder@multi-arch-docker.iam.gserviceaccount.com`
+* Name: `builder`
 * Roles: `Artifact Registry Writer` - enables push and pull images from Artifact Registry
 
 ## Create SSH Credentials and Saving to Cloud Secrets and Project Metadata
@@ -122,10 +128,11 @@ To use and configure IAP, you need to grant yourself these roles via
 
 If you can't grant yourself these permissions, ask a teammate or manager who has higher privileges to help.
 
-Enable IAP for the project:
+Enable IAP and CLoud Build APIs:
 
 ```bash
 gcloud --project=multi-arch-docker services enable iap.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
 ```
 
 Add a firewall rule enabling IAP access from Cloud Build IPs:
@@ -171,13 +178,12 @@ We need to create an `arm64` VM, and do some manual installation steps.  These s
 In the [GCP Console - VM Instances](https://console.cloud.google.com/compute/instances?project=multi-arch-docker),
 use **Create Instance**:
 
-* Name: builder-arm64-2cpu
-* Zone: us-central1-a
-* Series: T2A
-* Machine Type: t2a-standard-2 (experimentation shows that 2 CPUs is sufficient to handle multi-arch builds)
-* OS: Debian 11
+* Name: `builder-arm64-2cpu`
+* Zone: `us-central1-a`
+* Series: `T2A`
+* Machine Type: `t2a-standard-2` (experimentation shows that 2 CPUs is sufficient to handle multi-arch builds)
+* Disk: `40G`, `SSD persistent disk`, `Debian GNU/Linux 11 (bullseye)`
 * Service Account: `builder@multi-arch-docker.iam.gserviceaccount.com`
-* Disk: 40G, SSD persistent disk
 
 ### Environment Variables
 
