@@ -147,13 +147,13 @@ buildx-setup:
 	@echo "Setting up buildx, MULTI_CONTEXT=$(MULTI_CONTEXT).  Current builders:"
 	$(DOCKER_BUILDX_NORMAL) ls || true
 	@if ! $(DOCKER_BUILDX_NORMAL) inspect --builder $(BUILDER) > /dev/null 2>&1; then \
-  		if [ "$(MULTI_CONTEXT)" = "1" ]; then \
-  			echo "Creating new multi-context builder '$(BUILDER)'"; \
-  		    $(DOCKER_BUILDX_NORMAL) create --use --name $(BUILDER) --platform linux/amd64 amd_node; \
-            $(DOCKER_BUILDX_NORMAL) create --append --name $(BUILDER) --platform linux/arm64 arm_node; \
-  		else \
-  			echo "Creating new builder '$(BUILDER)'"; \
-  			$(DOCKER_BUILDX_NORMAL) create --name $(BUILDER); \
+		if [ "$(MULTI_CONTEXT)" = "1" ]; then \
+			echo "Creating new multi-context builder '$(BUILDER)'"; \
+ 			$(DOCKER_BUILDX_NORMAL) create --use --name $(BUILDER) --platform linux/amd64 amd_node; \
+			$(DOCKER_BUILDX_NORMAL) create --append --name $(BUILDER) --platform linux/arm64 arm_node; \
+		else \
+			echo "Creating new builder '$(BUILDER)'"; \
+			$(DOCKER_BUILDX_NORMAL) create --name $(BUILDER); \
 		fi \
 	else \
 		echo "Using existing builder $(BUILDER)"; \
