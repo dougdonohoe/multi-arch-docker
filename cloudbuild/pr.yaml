@@ -34,7 +34,7 @@ steps:
         fi
         
         set -o errexit
-        make start-vm
+        GCP_PROJECT=${PROJECT_ID} make start-vm
         # A bit dodgy, but need to sleep a bit otherwise IAP-ssh tunnel fails with 
         # "Error while connecting [4047: 'Failed to lookup instance']."
         # Maybe a wait-for loop here would make sense?
@@ -49,7 +49,7 @@ steps:
     args:
       - "-c"
       - |
-        ENV=${_ENV} make thirdparty
+        ENV=${_ENV} GCP_PROJECT=${PROJECT_ID} make thirdparty
   #
   # Setup - Here we need to configure things for 'docker buildx' to work.  Also used with 'waitFor',
   #         where steps after this occur in parallel.
@@ -79,7 +79,7 @@ steps:
         docker context ls
 
         # log env info
-        ENV=${_ENV} MULTI_CONTEXT=1 make info
+        GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} MULTI_CONTEXT=1 make info
         echo "Ready, set, build!"
   #
   # Runtime image
@@ -93,8 +93,8 @@ steps:
       - "-c"
       - |
         set -o errexit
-        make ssh-tunnel
-        ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="runtime" make buildx-publish-runtime
+        GCP_PROJECT=${PROJECT_ID} make ssh-tunnel
+        GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="runtime" make buildx-publish-runtime
   #
   # Build image
   #
@@ -107,8 +107,8 @@ steps:
       - "-c"
       - |
         set -o errexit
-        make ssh-tunnel
-        ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="build" make buildx-publish-build
+        GCP_PROJECT=${PROJECT_ID} make ssh-tunnel
+        GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="build" make buildx-publish-build
   #
   # odb
   #
@@ -121,8 +121,8 @@ steps:
       - "-c"
       - |
         set -o errexit
-        make ssh-tunnel
-        ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="odb" make buildx-publish-odb
+        GCP_PROJECT=${PROJECT_ID} make ssh-tunnel
+        GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} MULTI_CONTEXT=1 BUILDER="odb" make buildx-publish-odb
   #
   # Stop VM
   #
@@ -142,13 +142,13 @@ steps:
         fi
 
         set -o errexit
-        make stop-vm
+        GCP_PROJECT=${PROJECT_ID} make stop-vm
 
 substitutions:
   # By default, when this build is run, artifacts are published to development docker repo
   _ENV: docker-dev
   # Where to find cloud builder image (default version should be in kept in sync with Makefile)
-  _CLOUDBUILD_IMAGE: us-docker.pkg.dev/multi-arch-docker/docker-dev/cloud-build:alpine3.15
+  _CLOUDBUILD_IMAGE: us-docker.pkg.dev/${PROJECT_ID}/docker-dev/cloud-build:alpine3.15
   # By default, do not start/stop VM
   _AUTO_START_STOP: "0"
 options:
