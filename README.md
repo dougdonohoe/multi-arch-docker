@@ -1,5 +1,14 @@
 # multi-arch-docker
 
+## Medium Article
+
+This repository is a companion to my
+[Faster Multi-Architecture Docker Builds on Google Cloud Build using arm64 VMs and buildx](TBD) Medium
+article.  The article provides some good context as to how this repo works, so I
+encourage you to read it too.
+
+## Overview
+
 This repo demonstrates how to build multi-architecture Docker images using a native
 `arm64` VM on Google Cloud Build and `docker buildx`.
 
@@ -46,7 +55,7 @@ added on.
 
 This image variant is meant to be an example of a build image that might be suitable for:
 
-- building "static" binaries to be copied into the runtime image
+- building "static" Go binaries to be copied into the runtime image
 - running CI tests
 
 It is, in essence, built upon the vanilla `golang:1.8-alpine3.15` image variant. The image is built 
@@ -55,6 +64,15 @@ with additional software packages installed to facilitate compiling Go binaries 
 ### `multi-arch-docker/docker-prod/build/odb:2.5.0-b.23`
 
 This image demonstrates building a complex C++ executable and libraries.
+
+## Periodic Refresh
+
+The `cloudbuild/pr.yaml` file can also be used to rebuild the images on a periodic basis
+(e.g., weekly).  The reason to do this is that the `thirdparty.sh` script fetches the 
+latest release of base images, when ensures the latest bug fixes and patches are included.
+
+In GCP, one can create a Scheduled Job to invoke the trigger, setting the `_ENV` to the 
+target repository (e.g., `docker-prod`).
 
 ## Implementation and Development Notes
 
@@ -72,7 +90,7 @@ While doing development, images are published (by default) to the
 [docker-dev](https://console.cloud.google.com/artifacts/docker/multi-arch-docker/us/docker-dev?project=multi-arch-docker)
 directory of our Artifact Registry repo.
 
-```shell
+```bash
 gcloud config set project multi-arch-docker
 make info
 make thirdparty
@@ -84,7 +102,7 @@ For a real-world production release, imagine having a build trigger that runs th
 using `_ENV=docker-prod` upon merge to master.  Before merging, take the following steps if
 the `Docker-cloud-builder` image changed or doesn't exist yet:
 
-```shell
+```bash
 gcloud config set project multi-arch-docker
 
 # Optional - only needed if source images for cloud-builder haven't been built yet
@@ -111,10 +129,17 @@ ENV=docker-prod make seed-arm64
 to demonstrate how "seeding" works (this can be used in as a short term solution if there are problems
 with the `arm64` VM).
 
+This also relied on this command running in the `setup` step of `pr.yaml`, which enables `arm64` builds via
+emulation:
+
+```text
+docker run --privileged --rm tonistiigi/binfmt --install linux/arm64
+```
+
 ### Docker Repository
 
 Every action done by the `Makefile` publishes images relative to a root Docker repository path.  The
-production repository is
+production repository is meant to be
 [us-docker.pkg.dev/multi-arch-docker/docker-prod](https://console.cloud.google.com/artifacts/browse/multi-arch-docker/docker-prod?project=multi-arch-docker).
 
 The `ENV` variable determines which repository to use.  If set to `docker-prod`, the production repository 
@@ -133,13 +158,9 @@ these values:
 
 Use the `ENV` variable to specify the repo in make commands like this:
 
-```shell
+```bash
 ENV=yourname-test make info
 ```
-
-### `make help`
-
-This list all available `make` commands.
 
 ### `make info`
 
@@ -165,35 +186,6 @@ we also update our thirdparty images.
 This step creates an image used in GCP Cloud Builds to run our build steps.  It typically only needs 
 to be run when a new repository is set up or changes are made to the `Dockerfile-cloud-builder` file.
 
-### `make seed-arm64`
-
-**NOTE**: As mentioned above, this script is no longer needed since we have a dedicated
-`arm64` VM.  However, keeping this around for reference and "just in case".
-
-**NOTE**: This step is meant to be run on an M1 (Apple Silicon) Mac on Linux `arm64` VM only.  
-
-The purpose of this script is to work around the issue that doing `arm64` builds in GCP Cloud Builder is 
-very very very slow due to QEMU emulation.  Utilizing the Docker `--cache-to`/`--cache-from` options, 
-we build the `arm64` images on a local M1 Mac or `arm64` VM and cache the build results in the artifact 
-registry.  These results are then re-used when the actual cloud build runs.  We are, in essence, 
-"seeding" the cache with the `arm64` images.
-
-One can run `make seed-arm64-dry-run` to see what commands this will actually run as a sanity
-check before running the real thing.
-
-You can verify caching is working by re-running the script.  While an initial run may take 20 minutes, 
-a re-run should take less than 2.
-
-To seed a build for a specific platform, you can do something like this:
-
-```shell
-# Dry run
-DRYRUN=1 PLATFORMS="linux/arm64" TAG_MODIFIER="arm64-seed" RUNTIME_VERSION=4 make buildx-publish-runtime
-
-# For real
-PLATFORMS="linux/arm64" TAG_MODIFIER="arm64-seed" RUNTIME_VERSION=4 make buildx-publish-runtime
-```
-
 ### `make cloud-build`
 
 This step launches the cloud build (defined in `pr.yaml`) to publish to the `docker-dev` repository.
@@ -201,8 +193,37 @@ This step launches the cloud build (defined in `pr.yaml`) to publish to the `doc
 By default, it assumes the `arm64` VM is already running (e.g., via `make start-vm`).  To auto start/stop the VM, 
 as build steps, do this:
 
-```shell
+```bash
 AUTO_START_STOP=1 make cloud-build
+```
+
+### `make seed-arm64`
+
+**NOTE**: As mentioned above, this script is no longer needed since we have a dedicated
+`arm64` VM.  However, keeping this around for reference and "just in case".
+
+**NOTE**: This step is meant to be run on an M1 (Apple Silicon) Mac on Linux `arm64` VM only.
+
+The purpose of this script is to work around the issue that doing `arm64` builds in GCP Cloud Builder is
+very very very slow due to QEMU emulation.  Utilizing the Docker `--cache-to`/`--cache-from` options,
+we build the `arm64` images on a local M1 Mac or `arm64` VM and cache the build results in the artifact
+registry.  These results are then re-used when the actual cloud build runs.  We are, in essence,
+"seeding" the cache with the `arm64` images.
+
+One can run `make seed-arm64-dry-run` to see what commands this will actually run as a sanity
+check before running the real thing.
+
+You can verify caching is working by re-running the script.  While an initial run may take 20 minutes,
+a re-run should take less than 2.
+
+To seed a build for a specific platform, you can do something like this:
+
+```bash
+# Dry run
+DRYRUN=1 PLATFORMS="linux/arm64" TAG_MODIFIER="arm64-seed" RUNTIME_VERSION=4 make buildx-publish-runtime
+
+# For real
+PLATFORMS="linux/arm64" TAG_MODIFIER="arm64-seed" RUNTIME_VERSION=4 make buildx-publish-runtime
 ```
 
 ### Docker Details
@@ -233,12 +254,12 @@ Run `make help` to list all build commands intended for developer use.
 
 After doing many local builds, you may see a message like:
 
-```shell
+```bash
 error: failed to solve: failed to create temp dir: mkdir /tmp/containerd-mount1784717: no space left on device
 ```
 
 To reclaim space:
 
-```shell
+```bash
 docker system prune
 ```

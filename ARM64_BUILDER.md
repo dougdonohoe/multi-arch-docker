@@ -1,5 +1,11 @@
 # ARM64 Builder
 
+## Medium Article
+
+The contents of this file are largely replicated in my 
+[Faster Multi-Architecture Docker Builds on Google Cloud Build using arm64 VMs and buildx](TBD) Medium
+article.  I've tried to keep the core instructions in sync, but the article may be a little easier to follow.
+
 ## Introduction
 
 This file documents how the dedicated `arm64` VM is created and set-up.  We do this because building `arm64`
@@ -23,14 +29,20 @@ Steps taken:
 ## GCP Project
 
 If you have the right permissions, you can create a new GCP project called `multi-arch-docker` to try
-this out.  If you have an existing GCP project, just do a global search and replace 
-of `multi-arch-docker` with your project name in all the files of this repo.
-
-## Enable the Artifact Registry API
+this out.  If you have an existing GCP project, it helps to set an environment variable, which is 
+used in some commands below, and also overrides the GCP_PROJECT variable in the Makefile:
 
 ```bash
-gcloud --project=multi-arch-docker services enable artifactregistry.googleapis.com
+export GCP_PROJECT=multi-arch-docker
 ```
+
+The commands shown in the remainder of this page assume you have set your current gcloud project like so:
+
+```bash
+gcloud config set project $GCP_PROJECT
+```
+
+Doing this eliminates the need to specify the `--project` flag in subsequent `gcloud` commands.
 
 ## Create Service Account
 
@@ -62,9 +74,9 @@ Then save as GCP secret (enable the API if prompted):
 
 ```bash
 gcloud secrets create build-google_compute_engine-ssh-priv --replication-policy="automatic" \
-       --project=multi-arch-docker --data-file=build-google_compute_engine.ed25519
+       --data-file=build-google_compute_engine.ed25519
 gcloud secrets create build-google_compute_engine-ssh-pub --replication-policy="automatic" \
-       --project=multi-arch-docker --data-file=build-google_compute_engine.ed25519.pub
+       --data-file=build-google_compute_engine.ed25519.pub
 ```
 
 You should see them in the [GCP Console - Secret Manager](https://console.cloud.google.com/security/secret-manager?referrer=search&project=multi-arch-docker).
@@ -83,7 +95,7 @@ gcloud secrets delete build-google_compute_engine-ssh-priv --project multi-arch-
 gcloud secrets delete build-google_compute_engine-ssh-pub --project multi-arch-docker
 ```
 
-Then need to uploaded as project metadata ([docs](https://cloud.google.com/compute/docs/connect/add-ssh-keys#add_ssh_keys_to_project_metadata) - 
+They need to uploaded as project metadata ([docs](https://cloud.google.com/compute/docs/connect/add-ssh-keys#add_ssh_keys_to_project_metadata) - 
 enabled the Compute API if prompted):
 
 ```text
@@ -131,14 +143,14 @@ If you can't grant yourself these permissions, ask a teammate or manager who has
 Enable IAP and CLoud Build APIs:
 
 ```bash
-gcloud --project=multi-arch-docker services enable iap.googleapis.com
+gcloud services enable iap.googleapis.com
 gcloud services enable cloudbuild.googleapis.com
 ```
 
 Add a firewall rule enabling IAP access from Cloud Build IPs:
 
 ```bash
-gcloud --project=multi-arch-docker compute firewall-rules create allow-ssh-ingress-from-iap \
+gcloud compute firewall-rules create allow-ssh-ingress-from-iap \
   --direction=INGRESS \
   --action=allow \
   --rules=tcp:22 \
@@ -148,7 +160,7 @@ gcloud --project=multi-arch-docker compute firewall-rules create allow-ssh-ingre
 Because we are using IAP, and for stronger security, we have disabled normal `ssh` via this command:
 
 ```bash
-gcloud --project=multi-arch-docker compute firewall-rules update default-allow-ssh --disabled
+gcloud compute firewall-rules update default-allow-ssh --disabled
 ```
 
 You can see firewall rules in the [GCP Console - Firewall](https://console.cloud.google.com/networking/firewalls/list?project=multi-arch-docker).
@@ -200,16 +212,17 @@ Login and then make yourself `root` since all subsequent commands need to run as
 having to `sudo` everything):
 
 ```bash
-# From Mac
+# On your machine
 gcloud compute ssh --zone "us-central1-a" $INSTANCE_NAME --project multi-arch-docker --tunnel-through-iap
 
-# On VM
+# On the VM
 sudo su -
 ```
 
 You may get a warning to install `numpy` for better performance:
 
 ```bash
+# On your machine
 $(gcloud info --format="value(basic.python_location)") -m pip install numpy
 ```
 
@@ -221,6 +234,7 @@ warnings don't go away.
 * Following [debian install instructions](https://docs.docker.com/engine/install/debian/).
 
 ```bash
+# On the VM
 apt-get install --yes ca-certificates curl gnupg lsb-release make
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -236,6 +250,7 @@ docker run hello-world
 ### Configure Docker Access
 
 ```bash
+# On the VM
 gcloud auth --quiet configure-docker us-docker.pkg.dev
 ```
 
@@ -251,6 +266,7 @@ AllowTcpForwarding yes
 Restart ssh
 
 ```
+# On the VM
 service ssh reload
 ```
 
@@ -273,6 +289,7 @@ By default, listening on the `tcp` socket isn't turned on.  To turn it on, add a
 `ExecStart` command (to the default, found in `/lib/systemd/system/docker.service`):
 
 ```bash
+# On the VM
 mkdir -p /etc/systemd/system/docker.service.d
 cat << EOF > /etc/systemd/system/docker.service.d/override.conf
 [Service]
@@ -282,6 +299,7 @@ EOF
 ```
 
 ```bash
+# On the VM
 # To restart, reload daemon and restart docker:
 systemctl daemon-reload
 systemctl restart docker.service
@@ -334,12 +352,6 @@ To test a cloud build, make sure the desired `ARM64_VM` name and `GCP_PROJECT` i
 ```text
 GCP_PROJECT ?= multi-arch-docker
 ARM64_VM ?= builder-arm64-2cpu
-```
-
-Enable the Cloud Build API:
-
-```bash
-gcloud services enable cloudbuild.googleapis.com
 ```
 
 Then, to run a build:
