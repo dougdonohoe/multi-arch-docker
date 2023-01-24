@@ -6,7 +6,7 @@
 
 set -e -o pipefail
 
-DST_IMAGE_ROOT=us-docker.pkg.dev/multi-arch-docker/${ENV:-docker-dev}
+DST_IMAGE_ROOT=us-docker.pkg.dev/${GCP_PROJECT:-multi-arch-docker}/${ENV:-docker-dev}
 SCRIPT_DIR=$(dirname $(cd ${0%/*} && echo $PWD/${0##*/}))
 THIRDPARTY_CONFIG="${SCRIPT_DIR}/thirdparty.txt"
 

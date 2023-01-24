@@ -103,7 +103,7 @@ $(GOPATH)/bin/crane:
 
 ## thirdparty: copy thirdparty images from official sources to our artifact registry
 thirdparty: $(GOPATH)/bin/crane
-	ENV=$(ENV) PATH=$(GOPATH)/bin:${PATH} ./thirdparty.sh
+	ENV=$(ENV) GCP_PROJECT=$(GCP_PROJECT) PATH=$(GOPATH)/bin:${PATH} ./thirdparty.sh
 
 ## build-publish-cloud-builder: build + push the image used in GCP cloud builds (see _CLOUDBUILD_IMAGE in pr.yaml)
 # Note: since this is only really used inside of GCP, a multi-arch image isn't necessary here, and we build for amd64
