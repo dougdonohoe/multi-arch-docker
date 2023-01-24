@@ -49,7 +49,7 @@ steps:
     args:
       - "-c"
       - |
-        ENV=${_ENV} GCP_PROJECT=${PROJECT_ID} make thirdparty
+        GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} make thirdparty
   #
   # Setup - Here we need to configure things for 'docker buildx' to work.  Also used with 'waitFor',
   #         where steps after this occur in parallel.
@@ -61,22 +61,24 @@ steps:
       - "-c"
       - |
         set -o errexit
-
-        # configure binfmt_misc with other architectures (e.g., arm64)
-        # this also, weirdly, seems to also make 'buildx' a recognized
-        # docker command (running 'docker buildx version' prior to this
-        # results in "'buildx' is not a docker command." error)
-        docker run --privileged --rm tonistiigi/binfmt --install all
+        echo "Docker version:"
         docker version
-        docker buildx version
+        echo
+        
+        echo "Docker buildx version: $(docker buildx version)"
+        echo
 
-        # create contexts: amd64 using localhost and arm64 using tunnel to dedicated VM
-        # this is how we use a remote VM to do the arm64 builds.  Each build step
-        # needs to create an ssh tunnel to the VM on port 2375
-        docker context create amd_node --docker "host=unix:///var/run/docker.sock"
-        docker context create arm_node --docker "host=tcp://127.0.0.1:2375"
+        # create arm64 context using tunnel to dedicated VM (amd64 is the 'default' context).
+        # Each build step needs to create an ssh tunnel from localhost:8375 to VM:2375 
+        docker context create arm_node --docker "host=tcp://127.0.0.1:8375"
+
         echo "Docker contexts:"
         docker context ls
+        echo
+        
+        echo "Docker buildx builders:"
+        docker buildx ls
+        echo
 
         # log env info
         GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} MULTI_CONTEXT=1 make info

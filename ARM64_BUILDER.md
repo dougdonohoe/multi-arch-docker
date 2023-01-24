@@ -298,16 +298,16 @@ netstat -tulpn | grep dockerd # should show '0 :::2375' as "Local Address"
 Test port forwarding on Mac IAP:
 
 ```bash
-gcloud compute ssh --zone $ZONE $INSTANCE_NAME --tunnel-through-iap --project multi-arch-docker -- -L 2375:0.0.0.0:2375 -N
+gcloud compute ssh --zone $ZONE $INSTANCE_NAME --tunnel-through-iap --project multi-arch-docker -- -L 8375:0.0.0.0:2375 -N
 
 # -f to put in background
-gcloud compute ssh --zone $ZONE $INSTANCE_NAME --tunnel-through-iap --project multi-arch-docker -- -L 2375:0.0.0.0:2375 -N -f
+gcloud compute ssh --zone $ZONE $INSTANCE_NAME --tunnel-through-iap --project multi-arch-docker -- -L 8375:0.0.0.0:2375 -N -f
 ```
 
 Create a context on Mac and a builder that uses that context:
 
 ```bash
-docker context create arm_node_tunnel --docker "host=tcp://127.0.0.1:2375"
+docker context create arm_node_tunnel --docker "host=tcp://127.0.0.1:8375"
 docker buildx create --use --name remote-arm-tunnel --platform linux/arm64 arm_node_tunnel
 ```
 

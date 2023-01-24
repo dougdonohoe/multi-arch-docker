@@ -11,6 +11,7 @@ help:
 # production 'docker-prod' packages when running on a developer mac)
 ENV ?= docker-dev
 GCP_PROJECT ?= multi-arch-docker
+ZONE ?= us-central1-a
 DOCKER_REPO = us-docker.pkg.dev/$(GCP_PROJECT)/$(ENV)
 CACHE_ROOT = $(DOCKER_REPO)/cache
 
@@ -45,7 +46,7 @@ ARM64_VM ?= builder-arm64-2cpu
 # By default, do not auto start/stop VM in build
 AUTO_START_STOP ?= 0
 
-# If set to 1, assumes caller has created 'amd_node' and 'arm_node' Docker contexts, which is
+# If set to 1, assumes caller has created 'default' (amd64) and 'arm_node' Docker contexts, which is
 # how we do arm64 builds on remote hardware.  See 'pr.yaml' to see context creation.
 MULTI_CONTEXT ?= 0
 
@@ -142,15 +143,16 @@ build-odb:
 		--build-arg ODB_VERSION=$(ODB_VERSION) \
 		--pull --tag $(ODB_TAG) .
 
-# common setup for buildx tasks.  If MULTI_CONTEXT=1, this assumes 'amd_node' and 'arm_node' contexts exist.
+# common setup for buildx tasks.  If MULTI_CONTEXT=1, this assumes 'default' (amd64) and 'arm_node' contexts exist.
 buildx-setup:
 	@echo "Setting up buildx, MULTI_CONTEXT=$(MULTI_CONTEXT).  Current builders:"
 	$(DOCKER_BUILDX_NORMAL) ls || true
 	@if ! $(DOCKER_BUILDX_NORMAL) inspect --builder $(BUILDER) > /dev/null 2>&1; then \
 		if [ "$(MULTI_CONTEXT)" = "1" ]; then \
 			echo "Creating new multi-context builder '$(BUILDER)'"; \
- 			$(DOCKER_BUILDX_NORMAL) create --use --name $(BUILDER) --platform linux/amd64 amd_node; \
+ 			$(DOCKER_BUILDX_NORMAL) create --use --name $(BUILDER) --platform linux/amd64 default; \
 			$(DOCKER_BUILDX_NORMAL) create --append --name $(BUILDER) --platform linux/arm64 arm_node; \
+			$(DOCKER_BUILDX_NORMAL) ls; \
 		else \
 			echo "Creating new builder '$(BUILDER)'"; \
 			$(DOCKER_BUILDX_NORMAL) create --name $(BUILDER); \
@@ -187,7 +189,6 @@ buildx-publish-runtime: buildx-setup
 		--pull --push --tag $(RUNTIME_TAG) .
 
 ## buildx-publish-odb: build and publish a multi-architecture odb image (amd64|arm64)
-ODB_BUILD_CACHE_TAG = $(ODB_CACHE_TAG)-as-build-stage
 buildx-publish-odb: buildx-setup
 	@echo '=> Building odb multi-arch image $(ODB_TAG)...'
 	$(DOCKER_BUILDX_SPLIT) build --file Dockerfile-odb \
@@ -197,23 +198,27 @@ buildx-publish-odb: buildx-setup
 		--build-arg DOCKER_REPO=$(DOCKER_REPO) \
 		--build-arg DEBIAN_VERSION=$(DEBIAN_VERSION) \
 		--build-arg ODB_VERSION=$(ODB_VERSION) \
-		--cache-from type=registry,ref=$(ODB_BUILD_CACHE_TAG) \
 		--cache-from type=registry,ref=$(ODB_CACHE_TAG) \
 		--cache-to type=registry,ref=$(ODB_CACHE_TAG),mode=max \
 		--pull --push --tag $(ODB_TAG) .
 
 ## start-vm: start the VM
 start-vm:
-	gcloud compute instances start $(ARM64_VM) --project $(GCP_PROJECT) --zone us-central1-a
+	gcloud compute instances start $(ARM64_VM) --project $(GCP_PROJECT) --zone $(ZONE)
 
 ## stop-vm: stop the VM
 stop-vm:
-	gcloud compute instances stop $(ARM64_VM) --project $(GCP_PROJECT) --zone us-central1-a
+	gcloud compute instances stop $(ARM64_VM) --project $(GCP_PROJECT) --zone $(ZONE)
+
+## ssh-vm: ssh into VM as root
+ssh-vm:
+	gcloud compute ssh --zone $(ZONE) root@$(ARM64_VM) --project $(GCP_PROJECT) \
+		--tunnel-through-iap
 
 ## ssh-tunnel: setup ssh-tunnel to remote arm64 VM
 ssh-tunnel:
-	gcloud compute ssh --project $(GCP_PROJECT) --zone us-central1-a $(ARM64_VM) \
-		--tunnel-through-iap -- -L 127.0.0.1:2375:0.0.0.0:2375 -N -f
+	gcloud compute ssh --project $(GCP_PROJECT) --zone $(ZONE) $(ARM64_VM) \
+		--tunnel-through-iap -- -L 127.0.0.1:8375:0.0.0.0:2375 -N -f
 
 ## pull-runtime: pull runtime image locally (do after doing a 'buildx-publish-runtime' to get the version for local platform)
 pull-runtime:
