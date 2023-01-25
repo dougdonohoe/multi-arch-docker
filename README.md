@@ -3,7 +3,7 @@
 ## Medium Article
 
 This repository is a companion to my
-[Faster Multi-Architecture Docker Builds on Google Cloud Build using arm64 VMs and buildx](TBD) Medium
+[Faster Multi-Architecture Docker Builds on Google Cloud Build using arm64 VMs and buildx](https://medium.com/@DougDonohoe/faster-multi-architecture-docker-builds-on-google-cloud-build-using-arm64-vms-and-buildx-63c7b5ac017b) Medium
 article.  The article provides some good context as to how this repo works, so I
 encourage you to read it too.
 

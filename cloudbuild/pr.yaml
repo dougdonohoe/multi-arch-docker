@@ -76,10 +76,6 @@ steps:
         docker context ls
         echo
         
-        echo "Docker buildx builders:"
-        docker buildx ls
-        echo
-
         # log env info
         GCP_PROJECT=${PROJECT_ID} ENV=${_ENV} MULTI_CONTEXT=1 make info
         echo "Ready, set, build!"

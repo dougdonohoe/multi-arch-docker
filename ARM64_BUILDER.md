@@ -3,7 +3,7 @@
 ## Medium Article
 
 The contents of this file are largely replicated in my 
-[Faster Multi-Architecture Docker Builds on Google Cloud Build using arm64 VMs and buildx](TBD) Medium
+[Faster Multi-Architecture Docker Builds on Google Cloud Build using arm64 VMs and buildx](https://medium.com/@DougDonohoe/faster-multi-architecture-docker-builds-on-google-cloud-build-using-arm64-vms-and-buildx-63c7b5ac017b) Medium
 article.  I've tried to keep the core instructions in sync, but the article may be a little easier to follow.
 
 ## Introduction
